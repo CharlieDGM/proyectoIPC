@@ -32,7 +32,109 @@ def mostrarBits(cadenaBits, contenedor, fila, columna):
     anchoCuadro = 15
     altoCuadro = 15
     anchoTotal = len(cadenaBits) * anchoCuadro
+    # -*- coding: utf-8 -*-
+def xor_list(bit_list):
+    """
+    XOR acumulativo de una lista/iterable de bits (0/1).
+    Devuelve 0 o 1.
+    """
+    resultado = 0
+    for bit in bit_list:
+        resultado ^= int(bit)
+    return resultado
 
+
+def decodificar_y_corregir_hamming_full(palabra_recibida: str):
+    """
+    Verifica una palabra de código de 12 bits (Hamming 12,8),
+    corrige un error de un solo bit (si la posición está en 1..12),
+    extrae los 8 bits de datos originales y devuelve:
+      (datos_corregidos_str, palabra_corregida_12bits_str, posicion_error)
+    Si el síndrome indica una posición fuera de 1..12, no corrige y avisa.
+    """
+    if len(palabra_recibida) != 12:
+        raise ValueError("Se requieren 12 bits de palabra de código.")
+
+    # Convertir a lista de enteros e añadir elemento 0 al inicio para usar índices 1..12
+    palabra = [0] + [int(b) for b in palabra_recibida]
+
+    # Calcular bits de chequeo (síndrome) usando XOR sobre las posiciones indicadas
+    c1 = xor_list([palabra[i] for i in [1, 3, 5, 7, 9, 11]])
+    c2 = xor_list([palabra[i] for i in [2, 3, 6, 7, 10, 11]])
+    c4 = xor_list([palabra[i] for i in [4, 5, 6, 7, 12]])
+    c8 = xor_list([palabra[i] for i in [8, 9, 10, 11, 12]])
+
+    # Síndrome en orden MSB->LSB: c8 c4 c2 c1
+    sindrome_binario = f"{c8}{c4}{c2}{c1}"
+    posicion_error = int(sindrome_binario, 2)
+
+    # Manejo del síndrome
+    if posicion_error == 0:
+        print("  [ESTADO]: No se detectaron errores de un solo bit.")
+    elif 1 <= posicion_error <= 12:
+        print(f"  [ERROR DETECTADO]: Síndrome {sindrome_binario} -> posición {posicion_error}.")
+        # invertir el bit erróneo
+        palabra[posicion_error] = 1 - palabra[posicion_error]
+        print(f"  [CORRECCIÓN]: Bit en posición {posicion_error} invertido.")
+    else:
+        # posición fuera del rango 1..12 => posible doble error o palabra inválida
+        print(f"  [AVISO]: Síndrome {sindrome_binario} indica posición {posicion_error} fuera de 1..12.")
+        print("  Esto puede indicar un error de más de 1 bit o una palabra corrupta; no se corrige.")
+
+    # Extraer los bits de datos en el orden D1..D8 (posiciones 3,5,6,7,9,10,11,12)
+    posiciones_datos = [3, 5, 6, 7, 9, 10, 11, 12]
+    datos_corregidos = "".join(str(palabra[i]) for i in posiciones_datos)
+
+    # Reconstruir la palabra corregida completa (índices 1..12)
+    palabra_corregida = "".join(str(palabra[i]) for i in range(1, 13))
+
+    return datos_corregidos, palabra_corregida, posicion_error
+
+
+def comparar_palabras(original: str, corregida: str):
+    """
+    Compara dos palabras de 12 bits (original vs corregida) y devuelve una lista con
+    las diferencias encontradas. Cada elemento es un dict:
+      {
+        'pos_global': int,        # 1..12
+        'bit_original': '0'/'1',
+        'bit_corregido': '0'/'1',
+        'tipo': 'paridad'|'dato',
+        'dato_indice': None|1..8
+      }
+    """
+    # Ajustar longitud si es necesario (padding con '0' por seguridad)
+    maxlen = max(len(original), len(corregida))
+    orig = original.ljust(maxlen, '0')
+    corr = corregida.ljust(maxlen, '0')
+
+    posiciones_paridad = {1, 2, 4, 8}
+    posiciones_datos = [3, 5, 6, 7, 9, 10, 11, 12]  # mapeo a D1..D8
+
+    diffs = []
+    for i in range(maxlen):
+        bo = orig[i]
+        bc = corr[i]
+        if bo != bc:
+            pos = i + 1
+            if pos in posiciones_paridad:
+                tipo = 'paridad'
+                dato_idx = None
+            else:
+                tipo = 'dato'
+                try:
+                    dato_idx = posiciones_datos.index(pos) + 1
+                except ValueError:
+                    dato_idx = None
+            diffs.append({
+                'pos_global': pos,
+                'bit_original': bo,
+                'bit_corregido': bc,
+                'tipo': tipo,
+                'dato_indice': dato_idx
+            })
+    return diffs
+    
     canva = tk.Canvas(contenedor, width=anchoTotal, height=altoCuadro)
     canva.grid(row=fila, column=columna, pady=10, padx=10)
 

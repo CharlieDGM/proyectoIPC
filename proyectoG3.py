@@ -26,6 +26,10 @@ def StringToROT13(texto):
 
 def ROT13ToString(texto):
     return StringToROT13(texto)
+#########################################
+#FUNCIONES PARA CODIGO HAMMING
+
+
 ######################################
 #FUNCIONES GUI
 def mostrarBits(cadenaBits, contenedor, fila, columna):
